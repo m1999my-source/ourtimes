@@ -21,11 +21,11 @@
     .card-shadow { 
       box-shadow: 0 12px 20px rgba(255, 133, 162, 0.12); 
     }
-    /* 隱藏滾動條但保持功能（年份列可以用手指左右滑動） */
+    /* 隱藏滾動條但保持功能 */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    /* 簡單流暢的動畫 */
+    /* 簡單流塵的動畫 */
     .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
     .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -86,15 +86,21 @@
           <div class="flex items-center text-xs text-[#FF85A2] font-bold">
             <span>📅 {{ item.date }}</span>
           </div>
-          <button @click="deleteMemory(item)" class="text-xs font-bold text-red-400 hover:text-red-600 bg-red-50/60 px-2.5 py-1 rounded-lg transition-colors">
-            刪除 😢
-          </button>
+          
+          <div class="flex gap-2">
+            <button @click="openEditDialog(item)" class="text-xs font-bold text-amber-500 hover:text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg transition-colors">
+              修改 ✏️
+            </button>
+            <button @click="deleteMemory(item)" class="text-xs font-bold text-red-400 hover:text-red-600 bg-red-50/60 px-2.5 py-1 rounded-lg transition-colors">
+              刪除 😢
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
-      <button @click="openDialog" class="w-full bg-[#FF5C8A] hover:bg-[#FF4375] text-white py-4 rounded-2xl text-center font-bold text-base shadow-lg shadow-pink-200 active:scale-95 transition-all">
+      <button @click="openAddDialog" class="w-full bg-[#FF5C8A] hover:bg-[#FF4375] text-white py-4 rounded-2xl text-center font-bold text-base shadow-lg shadow-pink-200 active:scale-95 transition-all">
         + 記錄我們的新瞬間 ✨
       </button>
     </div>
@@ -103,7 +109,9 @@
       <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl">
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
         
-        <h3 class="text-lg font-black text-[#FF5C8A] text-center mb-4">捕捉心動瞬間 ✨</h3>
+        <h3 class="text-lg font-black text-[#FF5C8A] text-center mb-4">
+          {{ isEditingMode ? '修改這段甜蜜回憶 ✏️' : '捕捉心動瞬間 ✨' }}
+        </h3>
         
         <div class="bg-[#FFF0F3] p-3.5 rounded-2xl flex justify-between items-center mb-4 border border-pink-100/50">
           <span class="text-sm font-bold text-[#FF5C8A]">📅 紀錄日子：</span>
@@ -115,7 +123,7 @@
                   class="w-full p-4 bg-gray-50/80 border border-gray-100 rounded-2xl focus:outline-none focus:border-[#FF5C8A] focus:bg-white mb-5 text-gray-700 transition-all placeholder-gray-300 resize-none leading-relaxed"></textarea>
         
         <button @click="saveMemory" class="w-full bg-[#FF5C8A] text-white py-4 rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform">
-          鎖進雲端時光膠囊 🔒
+          {{ isEditingMode ? '確認更新回憶 💕' : '鎖進雲端時光膠囊 🔒' }}
         </button>
       </div>
     </div>
@@ -131,11 +139,15 @@
 
         const memories = ref([]);
         const searchText = ref("");
-        const selectedYear = ref("all"); // 預設選取「全部」
+        const selectedYear = ref("all");
         const showModal = ref(false);
         const isSyncing = ref(false);
         const newContent = ref("");
         const selectedDate = ref(new Date().toISOString().split('T')[0]);
+        
+        // ⭐ 控制目前是「新增」還是「修改」狀態
+        const isEditingMode = ref(false);
+        const currentEditingId = ref(null);
 
         // 計算在一起的天數
         const daysTogether = computed(() => {
@@ -146,28 +158,22 @@
           return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
         });
 
-        // ⭐ 動態計算目前資料庫裡總共有哪些年份（自動產生按鈕，例如 [2025, 2026]）
+        // 動態計算目前資料庫裡總共有哪些年份
         const availableYears = computed(() => {
           const years = memories.value.map(m => {
             if (!m.date) return null;
-            return m.date.split("-")[0]; // 從 "2026-05-30" 切出 "2026"
+            return m.date.split("-")[0];
           }).filter(Boolean);
-          return [...new Set(years)].sort((a, b) => b - a); // 去除重複並從新到舊排序
+          return [...new Set(years)].sort((a, b) => b - a);
         });
 
-        // 排序、關鍵字過濾 ＆ ⭐ 年份篩選
+        // 排序、關鍵字過濾 ＆ 年份篩選
         const filteredMemories = computed(() => {
           let list = [...memories.value];
-          
-          // 1. 先按日期最新排最前
           list.sort((a, b) => b.date.localeCompare(a.date));
-          
-          // 2. 年份篩選
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
           }
-          
-          // 3. 關鍵字搜尋
           if (!searchText.value.trim()) return list;
           return list.filter(m => m.content.toLowerCase().includes(searchText.value.toLowerCase()));
         });
@@ -193,19 +199,41 @@
           setTimeout(() => { isSyncing.value = false; }, 500);
         };
 
-        // 儲存新回憶到 Firebase
+        // 打開「新增」彈窗
+        const openAddDialog = () => {
+          isEditingMode.value = false;
+          currentEditingId.value = null;
+          newContent.value = "";
+          const hktToday = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000);
+          selectedDate.value = hktToday.toISOString().split('T')[0];
+          showModal.value = true;
+        };
+
+        // ⭐ 打開「修改」彈窗，並把舊資料填進去
+        const openEditDialog = (item) => {
+          isEditingMode.value = true;
+          currentEditingId.value = item.id;
+          newContent.value = item.content;
+          selectedDate.value = item.date;
+          showModal.value = true;
+        };
+
+        // 儲存或更新回憶到 Firebase
         const saveMemory = async () => {
           if (!newContent.value.trim()) return;
           isSyncing.value = true;
           showModal.value = false;
           try {
-            const nextKey = "memory_" + Date.now();
-            const singleUrl = firebaseUrl.replace(".json", `/${nextKey}.json`);
+            // 如果是修改模式，沿用舊的 key 覆蓋它；如果是新資料，用時間戳產生新 key
+            const key = isEditingMode.value ? currentEditingId.value : ("memory_" + Date.now());
+            const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
+            
             await fetch(singleUrl, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ date: selectedDate.value, content: newContent.value })
             });
+            
             newContent.value = "";
             await fetchMemories();
           } catch (e) { alert("儲存失敗，請檢查資料庫規則設定！"); }
@@ -224,18 +252,12 @@
           isSyncing.value = false;
         };
 
-        const openDialog = () => {
-          const hktToday = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000);
-          selectedDate.value = hktToday.toISOString().split('T')[0];
-          showModal.value = true;
-        };
-
         onMounted(() => {
           fetchMemories(); 
           setInterval(silentFetch, 4000); 
         });
 
-        return { daysTogether, availableYears, selectedYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, openDialog, saveMemory, deleteMemory };
+        return { daysTogether, availableYears, selectedYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory };
       }
     }).mount('#app');
   </script>
