@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'dart:async';
-import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const OurTimesApp());
@@ -14,16 +11,10 @@ class OurTimesApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Our Times',
-      debugShowCheckedModeBanner: false, // 隱藏右上角醜醜的 Debug 標籤
       theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
+        scaffoldBackgroundColor: const Color(0xFFFFF5F5),
         useMaterial3: true,
-        // 🌟 核心：直接注入 Google Fonts 的可愛圓體/手寫風字體
-        fontFamily: 'Noto Sans TC', 
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF85A2), // 更粉嫩的蜜桃粉
-          primary: const Color(0xFFFF5C8A),
-          secondary: const Color(0xFFFFB3C6),
-        ),
       ),
       home: const HomePage(),
     );
@@ -38,17 +29,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // ⚠️ 請把這裡替換成你在 Firebase 複製的資料庫網址（結尾記得加上 /memories.json）
-  final String _firebaseUrl = "https://our-times-app-default-rtdb.firebaseio.com/memories.json";
-
+  // 設定在一起的起點日期：2025 年 10 月 26 日
   final DateTime _startDate = DateTime(2025, 10, 26);
-  
-  List<Map<String, String>> _allMemories = [];
+
+  final List<Map<String, String>> _allMemories = [
+    {"date": "2026-05-20", "content": "一起去海邊看日落，風很溫柔，你也是。"},
+    {"date": "2026-05-14", "content": "紀念日大餐！那家餐酒館的松露薯條超好吃 🍟"},
+    {"date": "2026-05-01", "content": "解鎖了新技能：兩個人一起組裝完客廳的櫃子，累炸但很有成就感！"},
+  ];
+
   List<Map<String, String>> _filteredMemories = [];
   bool _isSearching = false;
-  bool _isLoading = true;
-  bool _isSyncing = false; // 用於顯示右上角的小小同步特效
-  Timer? _syncTimer;
 
   final TextEditingController _dialogController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -57,83 +48,19 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _fetchMemoriesFromCloud();
+    // 確保一開始有完整資料
+    _filteredMemories = List.from(_allMemories);
     _searchController.addListener(_runFilter);
-
-    // 每隔 4 秒自動偷偷同步
-    _syncTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (!_isSearching) {
-        _fetchMemoriesFromCloud(silent: true);
-      }
-    });
   }
 
   @override
   void dispose() {
-    _syncTimer?.cancel();
     _dialogController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchMemoriesFromCloud({bool silent = false}) async {
-    if (!silent) {
-      setState(() => _isLoading = true);
-    } else {
-      setState(() => _isSyncing = true);
-    }
-    try {
-      final response = await http.get(Uri.parse(_firebaseUrl));
-      if (response.statusCode == 200 && response.body != 'null') {
-        final Map<String, dynamic> cloudData = json.decode(response.body);
-        
-        final List<Map<String, String>> loadedMemories = [];
-        cloudData.forEach((key, value) {
-          loadedMemories.add({
-            "id": key,
-            "date": value["date"].toString(),
-            "content": value["content"].toString(),
-          });
-        });
-
-        setState(() {
-          _allMemories = loadedMemories;
-          _sortMemories();
-          _runFilter();
-          _isLoading = false;
-          _isSyncing = false;
-        });
-      } else if (response.body == 'null') {
-        setState(() {
-          _allMemories = [];
-          _filteredMemories = [];
-          _isLoading = false;
-          _isSyncing = false;
-        });
-      }
-    } catch (e) {
-      if (!silent) setState(() => _isLoading = false);
-      setState(() => _isSyncing = false);
-    }
-  }
-
-  Future<void> _updateCloudDatabase() async {
-    setState(() => _isSyncing = true);
-    try {
-      final Map<String, Map<String, String>> uploadData = {};
-      for (int i = 0; i < _allMemories.length; i++) {
-        uploadData["memory_$i"] = {
-          "date": _allMemories[i]["date"]!,
-          "content": _allMemories[i]["content"]!,
-        };
-      }
-      await http.put(Uri.parse(_firebaseUrl), body: json.encode(uploadData));
-      setState(() => _isSyncing = false);
-    } catch (e) {
-      setState(() => _isSyncing = false);
-    }
-  }
-
+  // 用來計算在一起天數的方法
   int _calculateDaysTogether() {
     final today = DateTime.now();
     final start = DateTime(_startDate.year, _startDate.month, _startDate.day);
@@ -141,28 +68,33 @@ class _HomePageState extends State<HomePage> {
     return current.difference(start).inDays + 1;
   }
 
+  // 統一篩選邏輯，確保每次都產生新的 List 傳給 UI
   void _runFilter() {
-    if (_searchController.text.isEmpty) {
-      _filteredMemories = List.from(_allMemories);
-    } else {
-      _filteredMemories = _allMemories
-          .where((memory) => memory['content']!
-              .toLowerCase()
-              .contains(_searchController.text.toLowerCase()))
-          .toList();
-    }
+    setState(() {
+      if (_searchController.text.isEmpty) {
+        _filteredMemories = List.from(_allMemories);
+      } else {
+        _filteredMemories = _allMemories
+            .where((memory) => memory['content']!
+                .toLowerCase()
+                .contains(_searchController.text.toLowerCase()))
+            .toList();
+      }
+    });
   }
 
+  // 排序回憶：讓日期由新到舊排列
   void _sortMemories() {
     _allMemories.sort((a, b) => b['date']!.compareTo(a['date']!));
   }
 
+  // 輔助方法：重設搜尋狀態，讓操作完後的體驗更好
   void _resetSearch() {
     _isSearching = false;
-    _searchController.clear();
+    _searchController.clear(); // 這會觸發 _runFilter() 並重新整理全列表
   }
 
-  void _saveMemory({Map<String, String>? originalItem}) async {
+  void _saveMemory({Map<String, String>? originalItem}) {
     if (_dialogController.text.isNotEmpty) {
       setState(() {
         final newMemory = {
@@ -179,15 +111,15 @@ class _HomePageState extends State<HomePage> {
           _allMemories.add(newMemory);
         }
 
-        _sortMemories();
+        _sortMemories(); // 自動依日期排序
         _dialogController.clear();
         _selectedDate = DateTime.now();
-        _resetSearch();
-        _runFilter();
+        
+        // 儲存後重設搜尋狀態，避免畫面元素突兀消失
+        _resetSearch(); 
+        _runFilter(); 
       });
-      
       Navigator.pop(context);
-      await _updateCloudDatabase();
     }
   }
 
@@ -196,25 +128,23 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('要把回憶丟掉嗎？ 😢', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF5C8A))),
-          content: const Text('確定要刪除這段甜蜜的故事嗎？刪除後對方的畫面也會同步消失唷！'),
+          title: const Text('刪除回憶 😢'),
+          content: const Text('確定要刪除這段甜蜜的回憶嗎？刪除後就找不回來囉！'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('留著它', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              child: const Text('取消', style: TextStyle(color: Colors.grey)),
             ),
             TextButton(
-              onPressed: () async {
+              onPressed: () {
                 setState(() {
                   _allMemories.remove(item);
-                  _resetSearch();
+                  _resetSearch(); // 刪除後同樣重設搜尋狀態
                   _runFilter();
                 });
                 Navigator.pop(context);
-                await _updateCloudDatabase();
               },
-              child: const Text('狠心刪除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              child: const Text('確定刪除', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -231,10 +161,7 @@ class _HomePageState extends State<HomePage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFF5C8A),
-              surface: Colors.white,
-            ),
+            colorScheme: const ColorScheme.light(primary: Colors.pink),
           ),
           child: child!,
         );
@@ -259,90 +186,57 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
+                left: 20,
+                right: 20,
+                top: 20,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 50,
-                    height: 5,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
-                  ),
-                  const SizedBox(height: 15),
                   Text(
-                    originalItem != null ? '修改我們的時光膠囊 ✍️' : '捕捉新的心動瞬間 ✨',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF5C8A)),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF0F3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "📅 日期：${_selectedDate.toString().split(' ')[0]}",
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF5C8A)),
-                        ),
-                        TextButton(
-                          onPressed: () => _pickDate(context, setModalState),
-                          child: const Text('更換日子 🐾', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF5C8A))),
-                        ),
-                      ],
-                    ),
+                    originalItem != null ? '修改我們的故事 ✍️' : '紀錄我們的新瞬間 ✨',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.pink),
                   ),
                   const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "日期：${_selectedDate.toString().split(' ')[0]}",
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(width: 10),
+                      TextButton.icon(
+                        onPressed: () => _pickDate(context, setModalState),
+                        icon: const Icon(Icons.calendar_month, color: Colors.pink),
+                        label: const Text('更換日子', style: TextStyle(color: Colors.pink)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: _dialogController,
-                    maxLines: 4,
-                    cursorColor: const Color(0xFFFF5C8A),
-                    decoration: InputDecoration(
-                      hintText: "今天發生了什麼好玩或甜蜜的事呢...",
-                      hintStyle: TextStyle(color: Colors.pink.shade100),
-                      filled: true,
-                      fillColor: const Color(0xFFFAFAFA),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: Color(0xFFFF5C8A), width: 2),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: Colors.pink.shade50, width: 2),
-                      ),
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: "寫下此刻的心情...",
+                      border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 15),
+                  ElevatedButton(
+                    onPressed: () => _saveMemory(originalItem: originalItem),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.pink.withAlpha(26), // 修正 M3 的寫法
+                    ),
+                    child: const Text('儲存回憶'),
                   ),
                   const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () => _saveMemory(originalItem: originalItem),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF5C8A),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 2,
-                      ),
-                      child: const Text('鎖進回憶盒子 🔒', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
                 ],
               ),
             );
@@ -355,25 +249,11 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 🌟 背景改為草莓牛奶漸層感
-      backgroundColor: const Color(0xFFFFF5F6),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Our Times 💕',
-          style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFFF5C8A), fontSize: 24, letterSpacing: 1.5),
-        ),
+        title: const Text('Our Times'),
         actions: [
-          // 小小的雲端同步狀態提示
-          if (_isSyncing)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF5C8A))),
-            ),
           IconButton(
-            icon: Icon(_isSearching ? Icons.lens_blur : Icons.search_rounded, color: const Color(0xFFFF5C8A)),
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
             onPressed: () {
               setState(() {
                 _isSearching = !_isSearching;
@@ -385,152 +265,76 @@ class _HomePageState extends State<HomePage> {
           )
         ],
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF5C8A)))
-        : Column(
-            children: [
-              if (_isSearching)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                  child: TextField(
-                    controller: _searchController,
-                    cursorColor: const Color(0xFFFF5C8A),
-                    decoration: InputDecoration(
-                      labelText: '搜尋甜蜜回憶...',
-                      labelStyle: const TextStyle(color: Color(0xFFFF5C8A)),
-                      prefixIcon: const Icon(Icons.favorite_border_rounded, color: Color(0xFFFF5C8A)),
-                      filled: true,
-                      fillColor: Colors.white,
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFFFF5C8A)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFFFFB3C6)),
-                      ),
-                    ),
-                  ),
+      body: Column(
+        children: [
+          if (_isSearching)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  labelText: '搜尋回憶',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
                 ),
-              
-              // 🌟 重新設計的「在一起天數」大卡片
-              Padding(
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Card(
+              color: Colors.pink.shade50,
+              child: Padding(
                 padding: const EdgeInsets.all(20.0),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF85A2).withAlpha(30),
-                        blurRadius: 15,
-                        offset: const Offset(0, 8),
-                      )
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.favorite_rounded, color: Color(0xFFFF5C8A), size: 40),
-                        const SizedBox(height: 10),
-                        const Text('我們已經手牽手走過了', style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              '${_calculateDaysTogether()}',
-                              style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900, color: Color(0xFFFF5C8A)),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text('天 🐾', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFF5C8A))),
-                          ],
-                        ),
-                      ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.favorite, color: Colors.pink),
+                    const SizedBox(width: 10),
+                    Text(
+                      '我們在一起的第 ${_calculateDaysTogether()} 天',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.pink),
                     ),
-                  ),
+                  ],
                 ),
               ),
-
-              // 🌟 底部回憶列表
-              Expanded(
-                child: _filteredMemories.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '這裡空空的 📝\n點下方「＋」寫下第一個雲端回憶吧！',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFFFFB3C6), height: 1.6, fontWeight: FontWeight.bold),
-                        ),
-                      )
-                    : ListView.builder(
-                        physics: const BouncingScrollPhysics(), // 讓 iOS 滑動有彈性效果
-                        itemCount: _filteredMemories.length,
-                        itemBuilder: (context, index) {
-                          final memory = _filteredMemories[index];
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFFFF0F2), width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(8),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                )
-                              ],
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              title: Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
-                                child: Text(
-                                  memory['content']!,
-                                  style: const TextStyle(fontSize: 16, color: Color(0xFF4A4A4A), fontWeight: FontWeight.w600, height: 1.5),
-                                ),
-                              ),
-                              subtitle: Row(
-                                children: [
-                                  const Icon(Icons.calendar_today_rounded, size: 12, color: Color(0xFFFF85A2)),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    memory['date']!,
-                                    style: const TextStyle(color: Color(0xFFFF85A2), fontSize: 13, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_note_rounded, color: Colors.blueAccent, size: 26),
-                                    onPressed: () => _showMemoryDialog(originalItem: memory),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFF85A2), size: 24),
-                                    onPressed: () => _deleteMemory(memory),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+            ),
           ),
-      // 🌟 加大且更好看的可愛加號按鈕
-      floatingActionButton: FloatingActionButton.large(
+          Expanded(
+            child: _filteredMemories.isEmpty
+                ? const Center(child: Text('目前沒有找到回憶唷 📝', style: TextStyle(color: Colors.grey)))
+                : ListView.builder(
+                    itemCount: _filteredMemories.length,
+                    itemBuilder: (context, index) {
+                      final memory = _filteredMemories[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: ListTile(
+                          title: Text(memory['content']!),
+                          subtitle: Text(memory['date']!),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () => _showMemoryDialog(originalItem: memory),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _deleteMemory(memory),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _showMemoryDialog(),
-        backgroundColor: const Color(0xFFFF5C8A),
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: const Icon(Icons.add_comment_rounded, size: 30),
+        backgroundColor: Colors.pink,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
