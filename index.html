@@ -3,15 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Our Times 💕</title>
-  <!-- 讓手機瀏覽器完美適應，禁止雙擊縮放，更像原生 App -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   
-  <!-- 載入可愛圓體字型 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
   
-  <!-- 引入 Vue 3 框架與 Tailwind CSS 畫美化工具（香港暢通無阻版本） -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
@@ -24,6 +21,10 @@
     .card-shadow { 
       box-shadow: 0 12px 20px rgba(255, 133, 162, 0.12); 
     }
+    /* 隱藏滾動條但保持功能（年份列可以用手指左右滑動） */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
     /* 簡單流暢的動畫 */
     .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
     .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -35,16 +36,13 @@
 
   <div id="app" class="max-w-md mx-auto pb-24">
     
-    <!-- 頂部標題與同步狀態 -->
     <div class="flex justify-between items-center mb-5 px-1">
       <h1 class="text-2xl font-black text-[#FF5C8A] tracking-wider">Our Times 💕</h1>
-      <!-- 右上角小小的雲端同步提示 -->
       <div v-if="isSyncing" class="text-xs font-bold text-[#FF5C8A] bg-pink-50 px-2.5 py-1 rounded-full flex items-center gap-1">
         <span class="animate-spin inline-block">🔄</span> 同步中
       </div>
     </div>
 
-    <!-- 在一起天數大卡片（拍立得相紙風格） -->
     <div class="bg-white rounded-[28px] p-6 text-center card-shadow mb-6 border border-[#FFF0F2]">
       <div class="text-[#FF5C8A] text-4xl mb-2 animate-pulse">❤️</div>
       <p class="text-xs text-gray-400 font-bold tracking-widest uppercase">我們已經手牽手走過了</p>
@@ -54,8 +52,7 @@
       </div>
     </div>
 
-    <!-- 搜尋框 -->
-    <div class="mb-5">
+    <div class="mb-4">
       <div class="relative">
         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#FF85A2]">🔍</span>
         <input v-model="searchText" type="text" placeholder="搜尋我們的甜蜜回憶..." 
@@ -63,14 +60,24 @@
       </div>
     </div>
 
-    <!-- 回憶時光軸列表 -->
+    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-1 px-1">
+      <button @click="selectedYear = 'all'" 
+              :class="selectedYear === 'all' ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
+              class="px-5 py-2 rounded-full text-xs font-black shadow-sm transition-all whitespace-nowrap active:scale-95">
+        ✨ 全部回憶
+      </button>
+      <button v-for="year in availableYears" :key="year" @click="selectedYear = year"
+              :class="selectedYear === year ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
+              class="px-5 py-2 rounded-full text-xs font-black shadow-sm transition-all whitespace-nowrap active:scale-95">
+        🗓️ {{ year }} 年
+      </button>
+    </div>
+
     <div class="space-y-4">
-      <!-- 沒資料時的可愛提示 -->
       <div v-if="filteredMemories.length === 0" class="text-center py-16 text-[#FFB3C6] font-bold text-sm leading-relaxed">
-        🧼 這裡還沒有紀錄唷<br>點下方按鈕寫下我們第一個雲端故事吧！
+        🧼 這一類別還沒有紀錄唷<br>點下方按鈕寫下我們第一個故事吧！
       </div>
       
-      <!-- 卡片卡片 -->
       <div v-for="(item, index) in filteredMemories" :key="item.id" 
            class="bg-white rounded-2xl p-5 border border-[#FFF0F2] shadow-sm relative transition-all active:scale-[0.99]">
         <p class="text-gray-700 font-medium leading-relaxed mb-3 whitespace-pre-wrap pr-4">{{ item.content }}</p>
@@ -79,7 +86,6 @@
           <div class="flex items-center text-xs text-[#FF85A2] font-bold">
             <span>📅 {{ item.date }}</span>
           </div>
-          <!-- 刪除按鈕 -->
           <button @click="deleteMemory(item)" class="text-xs font-bold text-red-400 hover:text-red-600 bg-red-50/60 px-2.5 py-1 rounded-lg transition-colors">
             刪除 😢
           </button>
@@ -87,32 +93,27 @@
       </div>
     </div>
 
-    <!-- 底部懸浮固定加號按鈕 -->
     <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
       <button @click="openDialog" class="w-full bg-[#FF5C8A] hover:bg-[#FF4375] text-white py-4 rounded-2xl text-center font-bold text-base shadow-lg shadow-pink-200 active:scale-95 transition-all">
         + 記錄我們的新瞬間 ✨
       </button>
     </div>
 
-    <!-- 彈出輸入彈窗（由下往上滑出） -->
     <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
       <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl">
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
         
         <h3 class="text-lg font-black text-[#FF5C8A] text-center mb-4">捕捉心動瞬間 ✨</h3>
         
-        <!-- 日期選擇區 -->
         <div class="bg-[#FFF0F3] p-3.5 rounded-2xl flex justify-between items-center mb-4 border border-pink-100/50">
-  <span class="text-sm font-bold text-[#FF5C8A]">📅 紀錄日子：</span>
-  <input type="date" v-model="selectedDate" 
-         class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
-</div>
+          <span class="text-sm font-bold text-[#FF5C8A]">📅 紀錄日子：</span>
+          <input type="date" v-model="selectedDate" 
+                 class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
+        </div>
         
-        <!-- 文字輸入 -->
         <textarea v-model="newContent" rows="4" placeholder="今天發生了什麼好玩、甜蜜，或想記下來的事呢..." 
                   class="w-full p-4 bg-gray-50/80 border border-gray-100 rounded-2xl focus:outline-none focus:border-[#FF5C8A] focus:bg-white mb-5 text-gray-700 transition-all placeholder-gray-300 resize-none leading-relaxed"></textarea>
         
-        <!-- 送出 -->
         <button @click="saveMemory" class="w-full bg-[#FF5C8A] text-white py-4 rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform">
           鎖進雲端時光膠囊 🔒
         </button>
@@ -130,12 +131,13 @@
 
         const memories = ref([]);
         const searchText = ref("");
+        const selectedYear = ref("all"); // 預設選取「全部」
         const showModal = ref(false);
         const isSyncing = ref(false);
         const newContent = ref("");
         const selectedDate = ref(new Date().toISOString().split('T')[0]);
 
-        // 計算在一起的天數 (已修正小 bug)
+        // 計算在一起的天數
         const daysTogether = computed(() => {
           const today = new Date();
           const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -144,10 +146,28 @@
           return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
         });
 
-        // 排序與關鍵字過濾
+        // ⭐ 動態計算目前資料庫裡總共有哪些年份（自動產生按鈕，例如 [2025, 2026]）
+        const availableYears = computed(() => {
+          const years = memories.value.map(m => {
+            if (!m.date) return null;
+            return m.date.split("-")[0]; // 從 "2026-05-30" 切出 "2026"
+          }).filter(Boolean);
+          return [...new Set(years)].sort((a, b) => b - a); // 去除重複並從新到舊排序
+        });
+
+        // 排序、關鍵字過濾 ＆ ⭐ 年份篩選
         const filteredMemories = computed(() => {
           let list = [...memories.value];
+          
+          // 1. 先按日期最新排最前
           list.sort((a, b) => b.date.localeCompare(a.date));
+          
+          // 2. 年份篩選
+          if (selectedYear.value !== 'all') {
+            list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
+          }
+          
+          // 3. 關鍵字搜尋
           if (!searchText.value.trim()) return list;
           return list.filter(m => m.content.toLowerCase().includes(searchText.value.toLowerCase()));
         });
@@ -215,7 +235,7 @@
           setInterval(silentFetch, 4000); 
         });
 
-        return { daysTogether, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, openDialog, saveMemory, deleteMemory };
+        return { daysTogether, availableYears, selectedYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, openDialog, saveMemory, deleteMemory };
       }
     }).mount('#app');
   </script>
