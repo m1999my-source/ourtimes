@@ -103,10 +103,10 @@
         
         <!-- 日期選擇區 -->
         <div class="bg-[#FFF0F3] p-3.5 rounded-2xl flex justify-between items-center mb-4 border border-pink-100/50">
-          <span class="text-sm font-bold text-[#FF5C8A]">📅 日期：{{ selectedDate }}</span>
-          <input type="date" v-model="selectedDate" class="opacity-0 absolute w-24 pointer-events-none" ref="dateInput">
-          <button @click="$refs.dateInput.showPicker()" class="text-xs font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm">修改日子 🐾</button>
-        </div>
+  <span class="text-sm font-bold text-[#FF5C8A]">📅 紀錄日子：</span>
+  <input type="date" v-model="selectedDate" 
+         class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
+</div>
         
         <!-- 文字輸入 -->
         <textarea v-model="newContent" rows="4" placeholder="今天發生了什麼好玩、甜蜜，或想記下來的事呢..." 
