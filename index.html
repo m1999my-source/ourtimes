@@ -7,7 +7,7 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght=500;700;900&display=swap" rel="stylesheet">
   
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -21,11 +21,11 @@
     .card-shadow { 
       box-shadow: 0 12px 20px rgba(255, 133, 162, 0.12); 
     }
-    /* 隱藏滾動條但保持功能 */
+    /* 隱藏滾動條但保持橫向滑動功能 */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
-    /* 簡單流塵的動畫 */
+    /* 動畫 */
     .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
     .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -60,16 +60,29 @@
       </div>
     </div>
 
-    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-4 pt-1 px-1">
-      <button @click="selectedYear = 'all'" 
+    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 pt-1 px-1">
+      <button @click="changeYear('all')" 
               :class="selectedYear === 'all' ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
               class="px-5 py-2 rounded-full text-xs font-black shadow-sm transition-all whitespace-nowrap active:scale-95">
-        ✨ 全部回憶
+        ✨ 全部年份
       </button>
-      <button v-for="year in availableYears" :key="year" @click="selectedYear = year"
+      <button v-for="year in availableYears" :key="year" @click="changeYear(year)"
               :class="selectedYear === year ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
               class="px-5 py-2 rounded-full text-xs font-black shadow-sm transition-all whitespace-nowrap active:scale-95">
         🗓️ {{ year }} 年
+      </button>
+    </div>
+
+    <div v-if="selectedYear !== 'all'" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
+      <button @click="selectedMonth = 'all'"
+              :class="selectedMonth === 'all' ? 'bg-[#FF85A2] text-white' : 'bg-pink-50/60 text-[#FF85A2]'"
+              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
+        全部月份
+      </button>
+      <button v-for="month in availableMonths" :key="month" @click="selectedMonth = month"
+              :class="selectedMonth === month ? 'bg-[#FF85A2] text-white' : 'bg-white text-gray-500 border border-gray-100'"
+              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
+        {{ parseInt(month) }} 月 🪵
       </button>
     </div>
 
@@ -140,12 +153,12 @@
         const memories = ref([]);
         const searchText = ref("");
         const selectedYear = ref("all");
+        const selectedMonth = ref("all"); // ⭐ 新增：選擇的月份
         const showModal = ref(false);
         const isSyncing = ref(false);
         const newContent = ref("");
         const selectedDate = ref(new Date().toISOString().split('T')[0]);
         
-        // ⭐ 控制目前是「新增」還是「修改」狀態
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
 
@@ -158,7 +171,7 @@
           return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
         });
 
-        // 動態計算目前資料庫裡總共有哪些年份
+        // 動態計算有哪些年份
         const availableYears = computed(() => {
           const years = memories.value.map(m => {
             if (!m.date) return null;
@@ -167,13 +180,39 @@
           return [...new Set(years)].sort((a, b) => b - a);
         });
 
-        // 排序、關鍵字過濾 ＆ 年份篩選
+        // ⭐ 動態計算「目前選定年份」下，有哪些月份有資料
+        const availableMonths = computed(() => {
+          if (selectedYear.value === 'all') return [];
+          const months = memories.value
+            .filter(m => m.date && m.date.startsWith(selectedYear.value))
+            .map(m => m.date.split("-")[1]); // 從 "2026-05-30" 切出 "05"
+          return [...new Set(months)].sort((a, b) => b - a); // 月份由大到小排序
+        });
+
+        // 切換年份時，自動把月份重設為「全部月份」
+        const changeYear = (year) => {
+          selectedYear.value = year;
+          selectedMonth.value = "all";
+        };
+
+        // 排序、關鍵字過濾 ＆ 雙層年月篩選
         const filteredMemories = computed(() => {
           let list = [...memories.value];
+          
+          // 1. 日期排序
           list.sort((a, b) => b.date.localeCompare(a.date));
+          
+          // 2. 年份篩選
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
+            
+            // 3. 月份篩選（只有選了特定年份，月份篩選才生效）
+            if (selectedMonth.value !== 'all') {
+              list = list.filter(m => m.date && m.date.split("-")[1] === selectedMonth.value);
+            }
           }
+          
+          // 4. 關鍵字搜尋
           if (!searchText.value.trim()) return list;
           return list.filter(m => m.content.toLowerCase().includes(searchText.value.toLowerCase()));
         });
@@ -199,7 +238,6 @@
           setTimeout(() => { isSyncing.value = false; }, 500);
         };
 
-        // 打開「新增」彈窗
         const openAddDialog = () => {
           isEditingMode.value = false;
           currentEditingId.value = null;
@@ -209,7 +247,6 @@
           showModal.value = true;
         };
 
-        // ⭐ 打開「修改」彈窗，並把舊資料填進去
         const openEditDialog = (item) => {
           isEditingMode.value = true;
           currentEditingId.value = item.id;
@@ -218,13 +255,11 @@
           showModal.value = true;
         };
 
-        // 儲存或更新回憶到 Firebase
         const saveMemory = async () => {
           if (!newContent.value.trim()) return;
           isSyncing.value = true;
           showModal.value = false;
           try {
-            // 如果是修改模式，沿用舊的 key 覆蓋它；如果是新資料，用時間戳產生新 key
             const key = isEditingMode.value ? currentEditingId.value : ("memory_" + Date.now());
             const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
             
@@ -240,7 +275,6 @@
           isSyncing.value = false;
         };
 
-        // 從 Firebase 刪除回憶
         const deleteMemory = async (item) => {
           if (!confirm("確定要刪除這段甜蜜的回憶嗎？😢\n刪除後對方的畫面也會同步不見唷！")) return;
           isSyncing.value = true;
@@ -257,7 +291,7 @@
           setInterval(silentFetch, 4000); 
         });
 
-        return { daysTogether, availableYears, selectedYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory };
+        return { daysTogether, availableYears, availableMonths, selectedYear, selectedMonth, changeYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory };
       }
     }).mount('#app');
   </script>
