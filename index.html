@@ -42,6 +42,7 @@
 
   <div id="app" class="max-w-md mx-auto pb-24">
     
+    <!-- 頂部標題與狀態 -->
     <div class="flex justify-between items-center mb-5 px-1">
       <h1 class="text-2xl font-black text-[#FF5C8A] tracking-wider">Our Times 💕</h1>
       <div v-if="isSyncing" class="text-xs font-bold text-[#FF5C8A] bg-pink-50 px-2.5 py-1 rounded-full flex items-center gap-1">
@@ -49,17 +50,19 @@
       </div>
     </div>
 
+    <!-- 紀念天數看板 -->
     <div class="beach-bg rounded-[28px] p-8 text-center card-shadow mb-6 border border-[#FFF0F2] relative overflow-hidden">
       <div class="backdrop-blur-[1px] py-2">
         <div class="text-[#FF5C8A] text-4xl mb-3 animate-pulse">❤️</div>
         <p class="text-xs text-purple-900 font-extrabold tracking-widest uppercase bg-white/50 inline-block px-3 py-1 rounded-full backdrop-blur-sm">我們已經手牽手走過了</p>
         <div class="flex justify-center items-baseline mt-3">
           <span class="text-6xl font-black text-[#FF3366] tracking-tight drop-shadow-[0_2px_4px_rgba(255,255,255,0.8)]">{{ daysTogether }}</span>
-          <span class="text-base font-black text-[#FF3366] ml-2 drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">天 🐾</span>
+          <span class="text-base font-black text-[#FF3366] ml-2 drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">天 </span>
         </div>
       </div>
     </div>
 
+    <!-- 搜尋框 -->
     <div class="mb-4">
       <div class="relative">
         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#FF85A2]">🔍</span>
@@ -68,11 +71,12 @@
       </div>
     </div>
 
+    <!-- 年份篩選：優化改為 "全部" -->
     <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 pt-1 px-1">
       <button @click="changeYear('all')" 
               :class="selectedYear === 'all' ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
               class="px-5 py-2 rounded-full text-xs font-black shadow-sm transition-all whitespace-nowrap active:scale-95">
-        ✨ 全部年份
+        ✨ 全部
       </button>
       <button v-for="year in availableYears" :key="year" @click="changeYear(year)"
               :class="selectedYear === year ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
@@ -81,7 +85,8 @@
       </button>
     </div>
 
-    <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
+    <!-- 月份篩選：當點選「全部」時，整個月份列會智慧隱藏，不佔用空間 -->
+    <div v-if="selectedYear !== 'all'" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
       <button @click="changeMonth('all')"
               :class="selectedMonth === 'all' ? 'bg-[#FF85A2] text-white' : 'bg-pink-50/60 text-[#FF85A2]'"
               class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
@@ -93,12 +98,17 @@
         {{ parseInt(month) }} 月 🪵
       </button>
     </div>
+    
+    <!-- 為了讓畫面在隱藏月份時比例和諧，加一個小間距 -->
+    <div v-else class="pt-2"></div>
 
+    <!-- 狀態與計數 -->
     <div class="px-1 mb-3 text-xs font-bold text-[#FF85A2] flex justify-between items-center">
       <span>📍 正在看：{{ currentFilterText }}</span>
       <span class="text-gray-400">共 {{ totalFilteredCount }} 條</span>
     </div>
 
+    <!-- 回憶卡片列表 -->
     <div class="space-y-4">
       <div v-if="paginatedMemories.length === 0" class="text-center py-16 text-[#FFB3C6] font-bold text-sm leading-relaxed">
         🧼 這一章節還沒有紀錄唷<br>點下方按鈕寫下我們的新故事吧！
@@ -134,6 +144,7 @@
       </div>
     </div>
 
+    <!-- 分頁導覽 -->
     <div v-if="totalPages > 1" class="flex justify-center items-center gap-4 mt-6 pb-6 animate-fade-in">
       <button @click="prevPage" :disabled="currentPage === 1"
               :class="currentPage === 1 ? 'opacity-40 bg-gray-200 text-gray-400' : 'bg-white text-[#FF5C8A] border border-pink-100 active:scale-95'"
@@ -150,12 +161,14 @@
       </button>
     </div>
 
+    <!-- 底部固定按鈕 -->
     <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
       <button @click="openAddDialog" class="w-full bg-[#FF5C8A] hover:bg-[#FF4375] text-white py-4 rounded-2xl text-center font-bold text-base shadow-lg shadow-pink-200 active:scale-95 transition-all">
         + 記錄我們的新瞬間 ✨
       </button>
     </div>
 
+    <!-- 彈出視窗對話盒 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
       <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl">
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
@@ -216,7 +229,7 @@
         const memories = ref([]);
         const searchText = ref("");
         
-        // 初始化時，自動抓今天的年份和月份作為預設篩選
+        // 預設自動選取當前的年份與月份
         const todayObj = new Date();
         const currentYearStr = todayObj.getFullYear().toString();
         const currentMonthStr = String(todayObj.getMonth() + 1).padStart(2, '0');
@@ -224,11 +237,8 @@
         const selectedYear = ref(currentYearStr);
         const selectedMonth = ref(currentMonthStr);
         
-        // 分頁狀態
         const currentPage = ref(1);
         const itemsPerPage = 10;
-        
-        // 文字折疊狀態
         const expandedCards = ref([]);
 
         const showModal = ref(false);
@@ -241,12 +251,12 @@
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
 
-        // 監聽搜尋文字，一旦改變就重置到第一頁
+        // 搜尋文字改變時，自動跳回分頁第一頁
         watch(searchText, () => {
           currentPage.value = 1;
         });
 
-        // 在一起天數
+        // 在一起天數計算
         const daysTogether = computed(() => {
           const today = new Date();
           const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -255,17 +265,15 @@
           return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
         });
 
-        // 提取所有年份
+        // 從資料中動態提取所有的年份
         const availableYears = computed(() => {
           const years = memories.value.map(m => m.date ? m.date.split("-")[0] : null).filter(Boolean);
           return [...new Set(years)].sort((a, b) => b - a);
         });
 
-        // 提取目前年份下的所有月份 (已修正 all 年份下的篩選邏輯)
+        // 動態提取所選年份下的月份 (已完美適配具體年份)
         const availableMonths = computed(() => {
-          if (selectedYear.value === 'all') {
-            return ['01','02','03','04','05','06','07','08','09','10','11','12'];
-          }
+          if (selectedYear.value === 'all') return [];
           const months = memories.value
             .filter(m => m.date && m.date.startsWith(selectedYear.value))
             .map(m => m.date.split("-")[1])
@@ -273,17 +281,19 @@
           return [...new Set(months)].sort((a, b) => b - a);
         });
 
-        // 當前看什麼的提示文字
+        // 頂部導覽提示字樣優化
         const currentFilterText = computed(() => {
           if (searchText.value.trim()) return `搜尋「${searchText.value}」的結果`;
-          const y = selectedYear.value === 'all' ? '全部年份' : `${selectedYear.value}年`;
+          if (selectedYear.value === 'all') return '總覽所有甜蜜回憶 ✨';
+          
+          const y = `${selectedYear.value}年`;
           const m = selectedMonth.value === 'all' ? '全部月份' : `${parseInt(selectedMonth.value)}月`;
           return `${y} ➔ ${m}`;
         });
 
         const changeYear = (year) => {
           selectedYear.value = year;
-          selectedMonth.value = "all";
+          selectedMonth.value = "all"; // 切換年份時，月份自動重設為該年全部
           currentPage.value = 1;
         };
 
@@ -292,16 +302,17 @@
           currentPage.value = 1;
         };
 
-        // 1. 核心大篩選與排序
+        // 核心大篩選與排序邏輯 (智慧過濾 "全部" 狀態)
         const filteredMemories = computed(() => {
           let list = [...memories.value];
           list.sort((a, b) => b.date.localeCompare(a.date));
           
+          // 如果不是選「全部」，才進行年份與月份的細向過濾
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
-          }
-          if (selectedMonth.value !== 'all') {
-            list = list.filter(m => m.date && m.date.split("-")[1] === selectedMonth.value);
+            if (selectedMonth.value !== 'all') {
+              list = list.filter(m => m.date && m.date.split("-")[1] === selectedMonth.value);
+            }
           }
           
           if (!searchText.value.trim()) return list;
@@ -311,20 +322,21 @@
         const totalFilteredCount = computed(() => filteredMemories.value.length);
         const totalPages = computed(() => Math.ceil(totalFilteredCount.value / itemsPerPage) || 1);
 
-        // 切出當前頁面要顯示的 10 條
+        // 分頁切片
         const paginatedMemories = computed(() => {
           const start = (currentPage.value - 1) * itemsPerPage;
           const end = start + itemsPerPage;
           return filteredMemories.value.slice(start, end);
         });
 
-        // 折疊文字字數處理
+        // 長文字縮短顯示
         const getTruncatedContent = (content) => {
           if (!content) return "";
           if (content.length <= 70) return content;
           return content.slice(0, 70);
         };
 
+        // 切換文字展開/收起
         const toggleExpand = (id) => {
           if (expandedCards.value.includes(id)) {
             expandedCards.value = expandedCards.value.filter(cid => cid !== id);
@@ -336,7 +348,7 @@
         const prevPage = () => { if (currentPage.value > 1) currentPage.value--; window.scrollTo({top: 0, behavior: 'smooth'}); };
         const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; window.scrollTo({top: 0, behavior: 'smooth'}); };
 
-        // 從 Firebase 下載資料
+        // 從 Firebase Fetch 資料
         const fetchMemories = async () => {
           try {
             const res = await fetch(firebaseUrl);
@@ -344,7 +356,7 @@
             if (data) {
               memories.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
               
-              // 檢查：如果目前月份完全沒資料，自動幫忙切換成「全部」
+              // 檢查防呆：如果目前月份完全沒資料，就大方切換成「全部」總覽
               const hasCurrentRecords = memories.value.some(m => m.date && m.date.startsWith(`${selectedYear.value}-${selectedMonth.value}`));
               if (!hasCurrentRecords && selectedYear.value === currentYearStr && selectedMonth.value === currentMonthStr) {
                 selectedYear.value = "all";
