@@ -21,7 +21,6 @@
     .card-shadow { 
       box-shadow: 0 12px 20px rgba(255, 133, 162, 0.12); 
     }
-    /* 隱藏滾動條但保持橫向滑動功能 */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     
@@ -97,7 +96,8 @@
         
         <div class="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-pink-50">
           <div class="flex items-center text-xs text-[#FF85A2] font-bold">
-            <span>📅 {{ item.date }}</span>
+            <span v-if="item.isRange">✈️ {{ item.date }} ~ {{ item.endDate }}</span>
+            <span v-else>📅 {{ item.date }}</span>
           </div>
           
           <div class="flex gap-2">
@@ -120,19 +120,44 @@
 
     <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
       <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl">
-        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-5"></div>
+        <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
         
-        <h3 class="text-lg font-black text-[#FF5C8A] text-center mb-4">
+        <h3 class="text-lg font-black text-[#FF5C8A] text-center mb-3">
           {{ isEditingMode ? '修改這段甜蜜回憶 ✏️' : '捕捉心動瞬間 ✨' }}
         </h3>
-        
-        <div class="bg-[#FFF0F3] p-3.5 rounded-2xl flex justify-between items-center mb-4 border border-pink-100/50">
-          <span class="text-sm font-bold text-[#FF5C8A]">📅 紀錄日子：</span>
-          <input type="date" v-model="selectedDate" 
-                 class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
+
+        <div class="flex justify-center mb-4">
+          <div class="bg-pink-50 p-1 rounded-xl flex gap-1">
+            <button @click="isRangeMode = false" 
+                    :class="!isRangeMode ? 'bg-[#FF5C8A] text-white' : 'text-[#FF85A2]'" 
+                    class="px-4 py-1.5 rounded-lg text-xs font-black transition-all">
+              📌 記錄單日
+            </button>
+            <button @click="isRangeMode = true" 
+                    :class="isRangeMode ? 'bg-[#FF5C8A] text-white' : 'text-[#FF85A2]'" 
+                    class="px-4 py-1.5 rounded-lg text-xs font-black transition-all">
+              ✈️ 記錄一段日子
+            </button>
+          </div>
         </div>
         
-        <textarea v-model="newContent" rows="4" placeholder="今天發生了什麼好玩、甜蜜，或想記下來的事呢..." 
+        <div class="bg-[#FFF0F3] p-3.5 rounded-2xl mb-4 border border-pink-100/50 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-bold text-[#FF5C8A]">
+              {{ isRangeMode ? '🛫 開始日子：' : '📅 紀錄日子：' }}
+            </span>
+            <input type="date" v-model="selectedDate" 
+                   class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
+          </div>
+          
+          <div v-if="isRangeMode" class="flex justify-between items-center pt-2 border-t border-pink-200/30 animate-fade-in">
+            <span class="text-sm font-bold text-[#FF5C8A]">🛬 結束日子：</span>
+            <input type="date" v-model="selectedEndDate" 
+                   class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
+          </div>
+        </div>
+        
+        <textarea v-model="newContent" rows="4" placeholder="記錄這段日子發生了什麼好玩、甜蜜，或想記下來的事呢..." 
                   class="w-full p-4 bg-gray-50/80 border border-gray-100 rounded-2xl focus:outline-none focus:border-[#FF5C8A] focus:bg-white mb-5 text-gray-700 transition-all placeholder-gray-300 resize-none leading-relaxed"></textarea>
         
         <button @click="saveMemory" class="w-full bg-[#FF5C8A] text-white py-4 rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform">
@@ -153,11 +178,14 @@
         const memories = ref([]);
         const searchText = ref("");
         const selectedYear = ref("all");
-        const selectedMonth = ref("all"); // ⭐ 新增：選擇的月份
+        const selectedMonth = ref("all");
+        
         const showModal = ref(false);
         const isSyncing = ref(false);
         const newContent = ref("");
         const selectedDate = ref(new Date().toISOString().split('T')[0]);
+        const selectedEndDate = ref(new Date().toISOString().split('T')[0]); // ⭐ 新增：結束日期
+        const isRangeMode = ref(false); // ⭐ 新增：是否為多日區間模式
         
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
@@ -180,16 +208,15 @@
           return [...new Set(years)].sort((a, b) => b - a);
         });
 
-        // ⭐ 動態計算「目前選定年份」下，有哪些月份有資料
+        // 動態計算月份
         const availableMonths = computed(() => {
           if (selectedYear.value === 'all') return [];
           const months = memories.value
             .filter(m => m.date && m.date.startsWith(selectedYear.value))
-            .map(m => m.date.split("-")[1]); // 從 "2026-05-30" 切出 "05"
-          return [...new Set(months)].sort((a, b) => b - a); // 月份由大到小排序
+            .map(m => m.date.split("-")[1]);
+          return [...new Set(months)].sort((a, b) => b - a);
         });
 
-        // 切換年份時，自動把月份重設為「全部月份」
         const changeYear = (year) => {
           selectedYear.value = year;
           selectedMonth.value = "all";
@@ -198,21 +225,14 @@
         // 排序、關鍵字過濾 ＆ 雙層年月篩選
         const filteredMemories = computed(() => {
           let list = [...memories.value];
+          list.sort((a, b) => b.date.localeCompare(a.date)); // 依開始日期排序
           
-          // 1. 日期排序
-          list.sort((a, b) => b.date.localeCompare(a.date));
-          
-          // 2. 年份篩選
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
-            
-            // 3. 月份篩選（只有選了特定年份，月份篩選才生效）
             if (selectedMonth.value !== 'all') {
               list = list.filter(m => m.date && m.date.split("-")[1] === selectedMonth.value);
             }
           }
-          
-          // 4. 關鍵字搜尋
           if (!searchText.value.trim()) return list;
           return list.filter(m => m.content.toLowerCase().includes(searchText.value.toLowerCase()));
         });
@@ -240,10 +260,14 @@
 
         const openAddDialog = () => {
           isEditingMode.value = false;
+          isRangeMode.value = false; // 預設單日
           currentEditingId.value = null;
           newContent.value = "";
+          
           const hktToday = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000);
-          selectedDate.value = hktToday.toISOString().split('T')[0];
+          const todayStr = hktToday.toISOString().split('T')[0];
+          selectedDate.value = todayStr;
+          selectedEndDate.value = todayStr;
           showModal.value = true;
         };
 
@@ -252,21 +276,44 @@
           currentEditingId.value = item.id;
           newContent.value = item.content;
           selectedDate.value = item.date;
+          
+          // 回填區間模式狀態
+          if (item.isRange) {
+            isRangeMode.value = true;
+            selectedEndDate.value = item.endDate;
+          } else {
+            isRangeMode.value = false;
+            selectedEndDate.value = item.date;
+          }
           showModal.value = true;
         };
 
         const saveMemory = async () => {
           if (!newContent.value.trim()) return;
+          
+          // 防呆：如果結束日期比開始日期早，自動幫忙調成一樣
+          if (isRangeMode.value && selectedEndDate.value < selectedDate.value) {
+            selectedEndDate.value = selectedDate.value;
+          }
+
           isSyncing.value = true;
           showModal.value = false;
           try {
             const key = isEditingMode.value ? currentEditingId.value : ("memory_" + Date.now());
             const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
             
+            // 打包傳送的資料結構
+            const payload = {
+              date: selectedDate.value,
+              content: newContent.value,
+              isRange: isRangeMode.value,
+              endDate: isRangeMode.value ? selectedEndDate.value : null
+            };
+
             await fetch(singleUrl, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ date: selectedDate.value, content: newContent.value })
+              body: JSON.stringify(payload)
             });
             
             newContent.value = "";
@@ -291,7 +338,7 @@
           setInterval(silentFetch, 4000); 
         });
 
-        return { daysTogether, availableYears, availableMonths, selectedYear, selectedMonth, changeYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory };
+        return { daysTogether, availableYears, availableMonths, selectedYear, selectedMonth, changeYear, searchText, filteredMemories, showModal, isSyncing, newContent, selectedDate, selectedEndDate, isRangeMode, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory };
       }
     }).mount('#app');
   </script>
