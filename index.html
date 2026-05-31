@@ -123,7 +123,7 @@
         <div class="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-pink-50">
           <div class="flex items-center text-xs text-[#FF85A2] font-bold">
             <span v-if="item.isRange">✈️ {{ item.date }} ~ {{ item.endDate }}</span>
-            <span v-else>📅 {{ item.date }}</span>
+            <span v-else>🗓️ {{ item.date }}</span>
           </div>
           
           <div class="flex gap-2">
@@ -189,7 +189,7 @@
         <div class="bg-[#FFF0F3] p-3.5 rounded-2xl mb-4 border border-pink-100/50 space-y-2">
           <div class="flex justify-between items-center">
             <span class="text-sm font-bold text-[#FF5C8A]">
-              {{ isRangeMode ? '🛫 開始日子：' : '📅 紀錄日子：' }}
+              {{ isRangeMode ? '🛫 開始日子：' : '🗓️ 紀錄日子：' }}
             </span>
             <input type="date" v-model="selectedDate" 
                    class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
