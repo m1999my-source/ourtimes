@@ -71,7 +71,7 @@
       </div>
     </div>
 
-    <!-- 年份篩選：優化改為 "全部" -->
+    <!-- 年份篩選 -->
     <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 pt-1 px-1">
       <button @click="changeYear('all')" 
               :class="selectedYear === 'all' ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
@@ -85,13 +85,8 @@
       </button>
     </div>
 
-    <!-- 月份篩選：當點選「全部」時，整個月份列會智慧隱藏，不佔用空間 -->
-    <div v-if="selectedYear !== 'all'" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
-      <button @click="changeMonth('all')"
-              :class="selectedMonth === 'all' ? 'bg-[#FF85A2] text-white' : 'bg-pink-50/60 text-[#FF85A2]'"
-              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
-        全部月份
-      </button>
+    <!-- 月份篩選：刪去了 "全部月份"，只在選取具體年份時顯示該年有的月份 -->
+    <div v-if="selectedYear !== 'all' && availableMonths.length > 0" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
       <button v-for="month in availableMonths" :key="month" @click="changeMonth(month)"
               :class="selectedMonth === month ? 'bg-[#FF85A2] text-white' : 'bg-white text-gray-500 border border-gray-100'"
               class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
@@ -99,7 +94,6 @@
       </button>
     </div>
     
-    <!-- 為了讓畫面在隱藏月份時比例和諧，加一個小間距 -->
     <div v-else class="pt-2"></div>
 
     <!-- 狀態與計數 -->
@@ -229,12 +223,13 @@
         const memories = ref([]);
         const searchText = ref("");
         
-        // 預設自動選取當前的年份與月份
+        // 預設自動選取當前的年份
         const todayObj = new Date();
         const currentYearStr = todayObj.getFullYear().toString();
         const currentMonthStr = String(todayObj.getMonth() + 1).padStart(2, '0');
 
         const selectedYear = ref(currentYearStr);
+        // 現在預設選取當前月份
         const selectedMonth = ref(currentMonthStr);
         
         const currentPage = ref(1);
@@ -271,7 +266,7 @@
           return [...new Set(years)].sort((a, b) => b - a);
         });
 
-        // 動態提取所選年份下的月份 (已完美適配具體年份)
+        // 動態提取所選年份下的月份（刪去了全部月份選項，直接取資料中有的月份）
         const availableMonths = computed(() => {
           if (selectedYear.value === 'all') return [];
           const months = memories.value
@@ -287,14 +282,32 @@
           if (selectedYear.value === 'all') return '總覽所有甜蜜回憶 ✨';
           
           const y = `${selectedYear.value}年`;
-          const m = selectedMonth.value === 'all' ? '全部月份' : `${parseInt(selectedMonth.value)}月`;
+          const m = selectedMonth.value === 'all' ? '整年回憶' : `${parseInt(selectedMonth.value)}月`;
           return `${y} ➔ ${m}`;
         });
 
         const changeYear = (year) => {
           selectedYear.value = year;
-          selectedMonth.value = "all"; // 切換年份時，月份自動重設為該年全部
+          // 當選擇具體年份時，由於沒有「全部月份」了，我們預設選取該年份中有資料的第一個月份
           currentPage.value = 1;
+          
+          if (year === 'all') {
+            selectedMonth.value = "all";
+          } else {
+            // 稍等一會等計算屬性更新，或直接撈取該年份的第一個可用月份
+            const months = memories.value
+              .filter(m => m.date && m.date.startsWith(year))
+              .map(m => m.date.split("-")[1])
+              .filter(Boolean);
+            
+            if (months.length > 0) {
+              const uniqueMonths = [...new Set(months)].sort((a, b) => b - a);
+              // 預設切換到最新有資料的那個月
+              selectedMonth.value = uniqueMonths[0];
+            } else {
+              selectedMonth.value = "all";
+            }
+          }
         };
 
         const changeMonth = (month) => {
@@ -302,12 +315,11 @@
           currentPage.value = 1;
         };
 
-        // 核心大篩選與排序邏輯 (智慧過濾 "全部" 狀態)
+        // 核心大篩選與排序邏輯
         const filteredMemories = computed(() => {
           let list = [...memories.value];
           list.sort((a, b) => b.date.localeCompare(a.date));
           
-          // 如果不是選「全部」，才進行年份與月份的細向過濾
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
             if (selectedMonth.value !== 'all') {
@@ -356,11 +368,23 @@
             if (data) {
               memories.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
               
-              // 檢查防呆：如果目前月份完全沒資料，就大方切換成「全部」總覽
+              // 檢查防呆：如果目前選取的年份/月份完全沒資料，就自動切換成「全部」總覽
               const hasCurrentRecords = memories.value.some(m => m.date && m.date.startsWith(`${selectedYear.value}-${selectedMonth.value}`));
-              if (!hasCurrentRecords && selectedYear.value === currentYearStr && selectedMonth.value === currentMonthStr) {
-                selectedYear.value = "all";
-                selectedMonth.value = "all";
+              if (!hasCurrentRecords && selectedYear.value === currentYearStr) {
+                // 如果今年今月沒資料，嘗試找今年最新有資料的月份
+                const thisYearMonths = memories.value
+                  .filter(m => m.date && m.date.startsWith(currentYearStr))
+                  .map(m => m.date.split("-")[1])
+                  .filter(Boolean);
+                
+                if (thisYearMonths.length > 0) {
+                  const sortedM = [...new Set(thisYearMonths)].sort((a, b) => b - a);
+                  selectedMonth.value = sortedM[0];
+                } else {
+                  // 如果連今年都沒資料，就直接去「全部」總覽
+                  selectedYear.value = "all";
+                  selectedMonth.value = "all";
+                }
               }
             } else {
               memories.value = [];
