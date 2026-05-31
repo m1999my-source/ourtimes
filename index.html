@@ -19,7 +19,13 @@
       -webkit-tap-highlight-color: transparent;
     }
     .card-shadow { 
-      box-shadow: 0 12px 20px rgba(255, 133, 162, 0.12); 
+      box-shadow: 0 12px 24px rgba(255, 133, 162, 0.15); 
+    }
+    /* ⭐ 新增：紫色沙灘背景圖樣式（加入柔和半透明遮罩，確保文字清晰） */
+    .beach-bg {
+      background-image: linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.25)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80');
+      background-size: cover;
+      background-position: center;
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -42,12 +48,14 @@
       </div>
     </div>
 
-    <div class="bg-white rounded-[28px] p-6 text-center card-shadow mb-6 border border-[#FFF0F2]">
-      <div class="text-[#FF5C8A] text-4xl mb-2 animate-pulse">❤️</div>
-      <p class="text-xs text-gray-400 font-bold tracking-widest uppercase">我們已經手牽手走過了</p>
-      <div class="flex justify-center items-baseline mt-1">
-        <span class="text-5xl font-black text-[#FF5C8A] tracking-tight">{{ daysTogether }}</span>
-        <span class="text-sm font-bold text-[#FF5C8A] ml-1.5">天 🐾</span>
+    <div class="beach-bg rounded-[28px] p-8 text-center card-shadow mb-6 border border-[#FFF0F2] relative overflow-hidden">
+      <div class="backdrop-blur-[1px] py-2">
+        <div class="text-[#FF5C8A] text-4xl mb-3 animate-pulse">❤️</div>
+        <p class="text-xs text-purple-900 font-extrabold tracking-widest uppercase bg-white/50 inline-block px-3 py-1 rounded-full backdrop-blur-sm">我們已經手牽手走過了</p>
+        <div class="flex justify-center items-baseline mt-3">
+          <span class="text-6xl font-black text-[#FF3366] tracking-tight drop-shadow-[0_2px_4px_rgba(255,255,255,0.8)]">{{ daysTogether }}</span>
+          <span class="text-base font-black text-[#FF3366] ml-2 drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">天 🐾</span>
+        </div>
       </div>
     </div>
 
@@ -184,8 +192,8 @@
         const isSyncing = ref(false);
         const newContent = ref("");
         const selectedDate = ref(new Date().toISOString().split('T')[0]);
-        const selectedEndDate = ref(new Date().toISOString().split('T')[0]); // ⭐ 新增：結束日期
-        const isRangeMode = ref(false); // ⭐ 新增：是否為多日區間模式
+        const selectedEndDate = ref(new Date().toISOString().split('T')[0]);
+        const isRangeMode = ref(false);
         
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
@@ -225,7 +233,7 @@
         // 排序、關鍵字過濾 ＆ 雙層年月篩選
         const filteredMemories = computed(() => {
           let list = [...memories.value];
-          list.sort((a, b) => b.date.localeCompare(a.date)); // 依開始日期排序
+          list.sort((a, b) => b.date.localeCompare(a.date));
           
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
@@ -260,7 +268,7 @@
 
         const openAddDialog = () => {
           isEditingMode.value = false;
-          isRangeMode.value = false; // 預設單日
+          isRangeMode.value = false;
           currentEditingId.value = null;
           newContent.value = "";
           
@@ -277,7 +285,6 @@
           newContent.value = item.content;
           selectedDate.value = item.date;
           
-          // 回填區間模式狀態
           if (item.isRange) {
             isRangeMode.value = true;
             selectedEndDate.value = item.endDate;
@@ -290,8 +297,6 @@
 
         const saveMemory = async () => {
           if (!newContent.value.trim()) return;
-          
-          // 防呆：如果結束日期比開始日期早，自動幫忙調成一樣
           if (isRangeMode.value && selectedEndDate.value < selectedDate.value) {
             selectedEndDate.value = selectedDate.value;
           }
@@ -302,7 +307,6 @@
             const key = isEditingMode.value ? currentEditingId.value : ("memory_" + Date.now());
             const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
             
-            // 打包傳送的資料結構
             const payload = {
               date: selectedDate.value,
               content: newContent.value,
