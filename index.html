@@ -90,7 +90,7 @@
       <button v-for="month in availableMonths" :key="month" @click="changeMonth(month)"
               :class="selectedMonth === month ? 'bg-[#FF85A2] text-white' : 'bg-white text-gray-500 border border-gray-100'"
               class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
-        {{ parseInt(month) }} 月 🪵
+        {{ parseInt(month) }} 月 🥂
       </button>
     </div>
     <div class="pt-2"></div>
@@ -140,7 +140,7 @@
         <div class="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-pink-50">
           <div class="flex items-center text-xs text-[#FF85A2] font-bold">
             <span v-if="item.isRange">✈️ {{ item.date }} ~ {{ item.endDate }}</span>
-            <span v-else>📅 {{ item.date }}</span>
+            <span v-else>🗓️ {{ item.date }}</span>
           </div>
           
           <div class="flex gap-2">
