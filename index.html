@@ -85,7 +85,7 @@
       </button>
     </div>
 
-    <!-- 月份篩選（已移除「整年回憶」按鈕） -->
+    <!-- 月份篩選 -->
     <div v-if="selectedYear !== 'all' && availableMonths.length > 0" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
       <button v-for="month in availableMonths" :key="month" @click="changeMonth(month)"
               :class="selectedMonth === month ? 'bg-[#FF85A2] text-white' : 'bg-white text-gray-500 border border-gray-100'"
@@ -126,7 +126,7 @@
         <div class="text-gray-700 font-medium leading-relaxed mb-3 whitespace-pre-wrap pr-2">
           <span>{{ expandedCards.includes(item.id) ? item.content : getTruncatedContent(item.content) }}</span>
           
-          <button v-if="item.content.length > 70" @click="toggleExpand(item.id)" 
+          <button v-if="item.content && item.content.length > 70" @click="toggleExpand(item.id)" 
                   class="text-xs font-bold text-[#FF5C8A] ml-1 focus:outline-none inline-block">
             {{ expandedCards.includes(item.id) ? '收起 👆' : '... 查看更多 💕' }}
           </button>
@@ -252,7 +252,7 @@
         <textarea v-model="newContent" rows="3" placeholder="記錄這段日子發生了什麼好玩、甜蜜，或想記下來的事呢..." 
                   class="w-full p-4 bg-gray-50/80 border border-gray-100 rounded-2xl focus:outline-none focus:border-[#FF5C8A] focus:bg-white mb-4 text-gray-700 transition-all placeholder-gray-300 resize-none leading-relaxed"></textarea>
         
-        <button @click="saveMemory" class="w-full bg-[#FF5C8A] text-white py-4 rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform">
+        <button @click="saveMemory" :disabled="isSyncing" class="w-full bg-[#FF5C8A] disabled:bg-gray-300 text-white py-4 rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform">
           {{ isEditingMode ? '確認更新回憶 💕' : '鎖進雲端時光膠囊 🔒' }}
         </button>
       </div>
@@ -261,7 +261,7 @@
   </div>
 
   <script>
-    const { createApp, ref, computed, watch, onMounted } = Vue;
+    const { createApp, ref, computed, watch, onMounted, onUnmounted } = Vue;
     createApp({
       setup() {
         const firebaseUrl = "https://our-times-app-default-rtdb.firebaseio.com/memories.json";
@@ -293,6 +293,7 @@
 
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
+        let intervalId = null;
 
         watch(searchText, () => { currentPage.value = 1; });
 
@@ -326,21 +327,23 @@
         const currentFilterText = computed(() => {
           if (searchText.value.trim()) return `搜尋「${searchText.value}」的結果`;
           if (selectedYear.value === 'all') return '總覽所有甜蜜回憶 ✨';
-          
           return `${selectedYear.value}年 ➔ ${parseInt(selectedMonth.value)}月`;
         });
 
-        // 💡 點選年份時的改良邏輯
         const changeYear = (year) => {
           selectedYear.value = year;
           if (year === 'all') {
             selectedMonth.value = "all_months";
           } else {
-            // 自動幫使用者抓出該年份「最新有紀錄」的月份，免去空白畫面
-            const yearRecords = memories.value.filter(m => m.date && m.date.startsWith(year));
-            if (yearRecords.length > 0) {
-              yearRecords.sort((a, b) => b.date.localeCompare(a.date));
-              selectedMonth.value = yearRecords[0].date.split("-")[1];
+            // 修正：確實找出該年份有紀錄的「最新月份」而非強行抓 index 0
+            const monthsInYear = memories.value
+              .filter(m => m.date && m.date.startsWith(year))
+              .map(m => m.date.split("-")[1])
+              .filter(Boolean);
+              
+            if (monthsInYear.length > 0) {
+              monthsInYear.sort((a, b) => b.localeCompare(a));
+              selectedMonth.value = monthsInYear[0];
             } else {
               selectedMonth.value = "01";
             }
@@ -353,7 +356,6 @@
           currentPage.value = 1;
         };
 
-        // 核心大篩選
         const filteredMemories = computed(() => {
           let list = [...memories.value];
           list.sort((a, b) => b.date.localeCompare(a.date));
@@ -412,7 +414,6 @@
               if (isFirstLoad) {
                 const hasCurrentMonthRecords = memories.value.some(m => m.date && m.date.startsWith(`${currentYearStr}-${currentMonthStr}`));
                 if (!hasCurrentMonthRecords) {
-                  // 如果本月沒紀錄，預設打開「✨ 全部」
                   selectedYear.value = "all";
                   selectedMonth.value = "all_months";
                 }
@@ -428,7 +429,8 @@
         };
 
         const silentFetch = async () => {
-          if (showModal.value) return; 
+          // 當對話盒開啟或正處於同步（儲存/刪除）狀態時，不進行背景輪詢覆蓋資料
+          if (showModal.value || isSyncing.value) return; 
           await fetchMemories(false); 
         };
 
@@ -449,7 +451,7 @@
         const openEditDialog = (item) => {
           isEditingMode.value = true;
           currentEditingId.value = item.id;
-          newContent.value = item.content;
+          newContent.value = item.content || "";
           selectedDate.value = item.date;
           
           restaurantRating.value = item.restaurantRating || 0;
@@ -470,10 +472,13 @@
           if (isRangeMode.value && selectedEndDate.value < selectedDate.value) {
             selectedEndDate.value = selectedDate.value;
           }
+          
           isSyncing.value = true;
           showModal.value = false;
+          
           try {
-            const key = isEditingMode.value ? currentEditingId.value : ("memory_" + Date.now());
+            // 改良：新增回憶時，如果沒有 ID 則改用 Firebase 偏好的隨機 UID 機制以策安全
+            const key = isEditingMode.value ? currentEditingId.value : ("memory_" + crypto.randomUUID().split('-')[0] + "_" + Date.now());
             const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
             
             const payload = {
@@ -494,8 +499,12 @@
             newContent.value = "";
             clearRestaurantInfo();
             await fetchMemories(false);
-          } catch (e) { alert("儲存失敗！"); }
-          isSyncing.value = false;
+          } catch (e) { 
+            alert("儲存失敗！"); 
+            console.error(e);
+          } finally {
+            isSyncing.value = false;
+          }
         };
 
         const deleteMemory = async (item) => {
@@ -511,7 +520,11 @@
 
         onMounted(() => {
           fetchMemories(true); 
-          setInterval(silentFetch, 5000); 
+          intervalId = setInterval(silentFetch, 5000); 
+        });
+
+        onUnmounted(() => {
+          if (intervalId) clearInterval(intervalId);
         });
 
         return { daysTogether, availableYears, availableMonths, selectedYear, selectedMonth, changeYear, changeMonth, searchText, currentFilterText, totalFilteredCount, currentPage, totalPages, paginatedMemories, expandedCards, getTruncatedContent, toggleExpand, prevPage, nextPage, showModal, isSyncing, newContent, selectedDate, selectedEndDate, isRangeMode, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory, restaurantRating, restaurantStatus, clearRestaurantInfo };
