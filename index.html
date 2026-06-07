@@ -85,13 +85,8 @@
       </button>
     </div>
 
-    <!-- 月份篩選 -->
+    <!-- 月份篩選（已移除「整年回憶」按鈕） -->
     <div v-if="selectedYear !== 'all' && availableMonths.length > 0" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
-      <button @click="changeMonth('all_months')"
-              :class="selectedMonth === 'all_months' ? 'bg-[#FF85A2] text-white' : 'bg-pink-50/60 text-[#FF85A2]'"
-              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
-        整年回憶
-      </button>
       <button v-for="month in availableMonths" :key="month" @click="changeMonth(month)"
               :class="selectedMonth === month ? 'bg-[#FF85A2] text-white' : 'bg-white text-gray-500 border border-gray-100'"
               class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
@@ -275,12 +270,10 @@
         const memories = ref([]);
         const searchText = ref("");
         
-        // 取得當前的年份與月份作為預設出發值
         const todayObj = new Date();
         const currentYearStr = todayObj.getFullYear().toString();
         const currentMonthStr = String(todayObj.getMonth() + 1).padStart(2, '0');
 
-        // 💡 預設一進來直接瞄準「今年」的「這個月」
         const selectedYear = ref(currentYearStr);
         const selectedMonth = ref(currentMonthStr);
         
@@ -334,14 +327,24 @@
           if (searchText.value.trim()) return `搜尋「${searchText.value}」的結果`;
           if (selectedYear.value === 'all') return '總覽所有甜蜜回憶 ✨';
           
-          const y = `${selectedYear.value}年`;
-          const m = selectedMonth.value === 'all_months' ? '整年回憶' : `${parseInt(selectedMonth.value)}月`;
-          return `${y} ➔ ${m}`;
+          return `${selectedYear.value}年 ➔ ${parseInt(selectedMonth.value)}月`;
         });
 
+        // 💡 點選年份時的改良邏輯
         const changeYear = (year) => {
           selectedYear.value = year;
-          selectedMonth.value = "all_months"; 
+          if (year === 'all') {
+            selectedMonth.value = "all_months";
+          } else {
+            // 自動幫使用者抓出該年份「最新有紀錄」的月份，免去空白畫面
+            const yearRecords = memories.value.filter(m => m.date && m.date.startsWith(year));
+            if (yearRecords.length > 0) {
+              yearRecords.sort((a, b) => b.date.localeCompare(a.date));
+              selectedMonth.value = yearRecords[0].date.split("-")[1];
+            } else {
+              selectedMonth.value = "01";
+            }
+          }
           currentPage.value = 1;
         };
 
@@ -399,7 +402,6 @@
         const prevPage = () => { if (currentPage.value > 1) currentPage.value--; window.scrollTo({top: 0, behavior: 'smooth'}); };
         const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; window.scrollTo({top: 0, behavior: 'smooth'}); };
 
-        // 核心邏輯：從 Firebase Fetch 資料
         const fetchMemories = async (isFirstLoad = false) => {
           try {
             const res = await fetch(firebaseUrl);
@@ -407,11 +409,10 @@
             if (data) {
               memories.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
               
-              // 💡 只有在第一次打開網頁時，才啟動「本月無資料，自動切回全部」的智慧防呆
               if (isFirstLoad) {
                 const hasCurrentMonthRecords = memories.value.some(m => m.date && m.date.startsWith(`${currentYearStr}-${currentMonthStr}`));
                 if (!hasCurrentMonthRecords) {
-                  // 如果這年這月沒紀錄，那就直接幫用家選到「✨ 全部」
+                  // 如果本月沒紀錄，預設打開「✨ 全部」
                   selectedYear.value = "all";
                   selectedMonth.value = "all_months";
                 }
@@ -428,7 +429,7 @@
 
         const silentFetch = async () => {
           if (showModal.value) return; 
-          await fetchMemories(false); // 定時靜默更新不需要干擾使用者當前選取的年份
+          await fetchMemories(false); 
         };
 
         const openAddDialog = () => {
@@ -509,7 +510,6 @@
         };
 
         onMounted(() => {
-          // 💡 傳入 true，代表這是初次加載，需進行「本月是否有資料」的智能切換
           fetchMemories(true); 
           setInterval(silentFetch, 5000); 
         });
