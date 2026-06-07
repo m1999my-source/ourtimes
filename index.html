@@ -30,7 +30,7 @@
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
     
-    /* 紫色沙灘背景 */
+    /* 背景 */
     .beach-bg {
       background-image: linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.25)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80');
       background-size: cover;
@@ -42,7 +42,6 @@
 
   <div id="app" class="max-w-md mx-auto pb-24">
     
-    <!-- 頂部標題與狀態 -->
     <div class="flex justify-between items-center mb-5 px-1">
       <h1 class="text-2xl font-black text-[#FF5C8A] tracking-wider">Our Times 💕</h1>
       <div v-if="isSyncing" class="text-xs font-bold text-[#FF5C8A] bg-pink-50 px-2.5 py-1 rounded-full flex items-center gap-1">
@@ -50,28 +49,25 @@
       </div>
     </div>
 
-    <!-- 紀念天數看板 -->
     <div class="beach-bg rounded-[28px] p-8 text-center card-shadow mb-6 border border-[#FFF0F2] relative overflow-hidden">
       <div class="backdrop-blur-[1px] py-2">
         <div class="text-[#FF5C8A] text-4xl mb-3 animate-pulse">❤️</div>
         <p class="text-xs text-purple-900 font-extrabold tracking-widest uppercase bg-white/50 inline-block px-3 py-1 rounded-full backdrop-blur-sm">我們已經手牽手走過了</p>
         <div class="flex justify-center items-baseline mt-3">
           <span class="text-6xl font-black text-[#FF3366] tracking-tight drop-shadow-[0_2px_4px_rgba(255,255,255,0.8)]">{{ daysTogether }}</span>
-          <span class="text-base font-black text-[#FF3366] ml-2 drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">天 </span>
+          <span class="text-base font-black text-[#FF3366] ml-2 drop-shadow-[0_1px_2px_rgba(255,255,255,0.8)]">天 🐾</span>
         </div>
       </div>
     </div>
 
-    <!-- 搜尋框 -->
     <div class="mb-4">
       <div class="relative">
         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-[#FF85A2]">🔍</span>
-        <input v-model="searchText" type="text" placeholder="搜尋我們的甜蜜回憶..." 
+        <input v-model="searchText" type="text" placeholder="搜尋我們的甜蜜回憶、餐廳或評價..." 
                class="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-white border border-[#FFB3C6] focus:outline-none focus:border-[#FF5C8A] text-gray-700 shadow-sm transition-all placeholder-pink-200">
       </div>
     </div>
 
-    <!-- 年份篩選 -->
     <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 pt-1 px-1">
       <button @click="changeYear('all')" 
               :class="selectedYear === 'all' ? 'bg-[#FF5C8A] text-white' : 'bg-white text-[#FF85A2] border border-pink-100'"
@@ -85,24 +81,25 @@
       </button>
     </div>
 
-    <!-- 月份篩選：刪去了 "全部月份"，只在選取具體年份時顯示該年有的月份 -->
     <div v-if="selectedYear !== 'all' && availableMonths.length > 0" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-4 pt-1 px-1 animate-fade-in">
+      <button @click="changeMonth('all_months')"
+              :class="selectedMonth === 'all_months' ? 'bg-[#FF85A2] text-white' : 'bg-pink-50/60 text-[#FF85A2]'"
+              class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
+        整年回憶
+      </button>
       <button v-for="month in availableMonths" :key="month" @click="changeMonth(month)"
               :class="selectedMonth === month ? 'bg-[#FF85A2] text-white' : 'bg-white text-gray-500 border border-gray-100'"
               class="px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap active:scale-95">
         {{ parseInt(month) }} 月 🪵
       </button>
     </div>
-    
     <div v-else class="pt-2"></div>
 
-    <!-- 狀態與計數 -->
     <div class="px-1 mb-3 text-xs font-bold text-[#FF85A2] flex justify-between items-center">
       <span>📍 正在看：{{ currentFilterText }}</span>
       <span class="text-gray-400">共 {{ totalFilteredCount }} 條</span>
     </div>
 
-    <!-- 回憶卡片列表 -->
     <div class="space-y-4">
       <div v-if="paginatedMemories.length === 0" class="text-center py-16 text-[#FFB3C6] font-bold text-sm leading-relaxed">
         🧼 這一章節還沒有紀錄唷<br>點下方按鈕寫下我們的新故事吧！
@@ -111,6 +108,18 @@
       <div v-for="(item, index) in paginatedMemories" :key="item.id" 
            class="bg-white rounded-2xl p-5 border border-[#FFF0F2] shadow-sm relative transition-all">
         
+        <div v-if="item.restaurantRating || item.restaurantStatus" class="flex flex-wrap items-center gap-2 mb-3">
+          <div v-if="item.restaurantRating" class="flex text-amber-400 text-xs bg-amber-50 px-2 py-1 rounded-lg font-bold items-center gap-0.5">
+            🍴 評分: <span class="ml-0.5">{{ '⭐'.repeat(item.restaurantRating) }}</span>
+          </div>
+          <div v-if="item.restaurantStatus === 'yes'" class="text-xs bg-emerald-50 text-emerald-600 font-extrabold px-2 py-1 rounded-lg border border-emerald-100 flex items-center gap-0.5">
+            ✨ 可以再去！🥰
+          </div>
+          <div v-if="item.restaurantStatus === 'no'" class="text-xs bg-red-50 text-red-500 font-extrabold px-2 py-1 rounded-lg border border-red-100 flex items-center gap-0.5">
+            ❌ 永不再去！🤮
+          </div>
+        </div>
+
         <div class="text-gray-700 font-medium leading-relaxed mb-3 whitespace-pre-wrap pr-2">
           <span>{{ expandedCards.includes(item.id) ? item.content : getTruncatedContent(item.content) }}</span>
           
@@ -123,7 +132,7 @@
         <div class="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-pink-50">
           <div class="flex items-center text-xs text-[#FF85A2] font-bold">
             <span v-if="item.isRange">✈️ {{ item.date }} ~ {{ item.endDate }}</span>
-            <span v-else>🗓️ {{ item.date }}</span>
+            <span v-else>📅 {{ item.date }}</span>
           </div>
           
           <div class="flex gap-2">
@@ -138,7 +147,6 @@
       </div>
     </div>
 
-    <!-- 分頁導覽 -->
     <div v-if="totalPages > 1" class="flex justify-center items-center gap-4 mt-6 pb-6 animate-fade-in">
       <button @click="prevPage" :disabled="currentPage === 1"
               :class="currentPage === 1 ? 'opacity-40 bg-gray-200 text-gray-400' : 'bg-white text-[#FF5C8A] border border-pink-100 active:scale-95'"
@@ -155,16 +163,14 @@
       </button>
     </div>
 
-    <!-- 底部固定按鈕 -->
     <div class="fixed bottom-6 left-0 right-0 px-4 max-w-md mx-auto z-40">
       <button @click="openAddDialog" class="w-full bg-[#FF5C8A] hover:bg-[#FF4375] text-white py-4 rounded-2xl text-center font-bold text-base shadow-lg shadow-pink-200 active:scale-95 transition-all">
         + 記錄我們的新瞬間 ✨
       </button>
     </div>
 
-    <!-- 彈出視窗對話盒 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-end justify-center z-50 animate-fade-in" @click.self="showModal = false">
-      <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl">
+      <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 pb-8 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
         
         <h3 class="text-lg font-black text-[#FF5C8A] text-center mb-3">
@@ -189,7 +195,7 @@
         <div class="bg-[#FFF0F3] p-3.5 rounded-2xl mb-4 border border-pink-100/50 space-y-2">
           <div class="flex justify-between items-center">
             <span class="text-sm font-bold text-[#FF5C8A]">
-              {{ isRangeMode ? '🛫 開始日子：' : '🗓️ 紀錄日子：' }}
+              {{ isRangeMode ? '🛫 開始日子：' : '📅 紀錄日子：' }}
             </span>
             <input type="date" v-model="selectedDate" 
                    class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
@@ -201,9 +207,41 @@
                    class="text-sm font-black text-white bg-[#FF5C8A] px-3 py-1.5 rounded-xl shadow-sm border-none focus:outline-none cursor-pointer text-center [color-scheme:dark]">
           </div>
         </div>
+
+        <div class="bg-amber-50/60 p-4 rounded-2xl mb-4 border border-amber-100 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-amber-800">🍔 今日有去餐廳食飯？(可選填)</span>
+            <button v-if="restaurantRating || restaurantStatus" @click="clearRestaurantInfo" class="text-[10px] text-amber-600 bg-white border border-amber-200 px-2 py-0.5 rounded-md font-bold">清除食評</button>
+          </div>
+          
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-amber-900/80">餐廳評分：</span>
+            <div class="flex gap-1.5 text-xl">
+              <span v-for="star in 5" :key="star" @click="restaurantRating = star" class="cursor-pointer transition-transform active:scale-125">
+                {{ star <= restaurantRating ? '⭐' : '☆' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1">
+            <span class="text-xs font-bold text-amber-900/80 whitespace-nowrap">雷達指標：</span>
+            <div class="flex gap-1.5 w-full">
+              <button @click="restaurantStatus = (restaurantStatus === 'yes' ? '' : 'yes')" 
+                      :class="restaurantStatus === 'yes' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-emerald-600 border-emerald-200'"
+                      class="flex-1 py-1.5 rounded-xl text-[11px] font-black border text-center transition-all active:scale-95 shadow-xs">
+                ✨ 可以再去
+              </button>
+              <button @click="restaurantStatus = (restaurantStatus === 'no' ? '' : 'no')" 
+                      :class="restaurantStatus === 'no' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-200'"
+                      class="flex-1 py-1.5 rounded-xl text-[11px] font-black border text-center transition-all active:scale-95 shadow-xs">
+                ❌ 永不再去
+              </button>
+            </div>
+          </div>
+        </div>
         
-        <textarea v-model="newContent" rows="4" placeholder="記錄這段日子發生了什麼好玩、甜蜜，或想記下來的事呢..." 
-                  class="w-full p-4 bg-gray-50/80 border border-gray-100 rounded-2xl focus:outline-none focus:border-[#FF5C8A] focus:bg-white mb-5 text-gray-700 transition-all placeholder-gray-300 resize-none leading-relaxed"></textarea>
+        <textarea v-model="newContent" rows="3" placeholder="記錄這段日子發生了什麼好玩、甜蜜，或想記下來的事呢..." 
+                  class="w-full p-4 bg-gray-50/80 border border-gray-100 rounded-2xl focus:outline-none focus:border-[#FF5C8A] focus:bg-white mb-4 text-gray-700 transition-all placeholder-gray-300 resize-none leading-relaxed"></textarea>
         
         <button @click="saveMemory" class="w-full bg-[#FF5C8A] text-white py-4 rounded-2xl font-bold text-base shadow-md active:scale-95 transition-transform">
           {{ isEditingMode ? '確認更新回憶 💕' : '鎖進雲端時光膠囊 🔒' }}
@@ -223,14 +261,12 @@
         const memories = ref([]);
         const searchText = ref("");
         
-        // 預設自動選取當前的年份
         const todayObj = new Date();
         const currentYearStr = todayObj.getFullYear().toString();
         const currentMonthStr = String(todayObj.getMonth() + 1).padStart(2, '0');
 
         const selectedYear = ref(currentYearStr);
-        // 現在預設選取當前月份
-        const selectedMonth = ref(currentMonthStr);
+        const selectedMonth = ref('all_months'); // 預設顯示整年回憶
         
         const currentPage = ref(1);
         const itemsPerPage = 10;
@@ -243,15 +279,21 @@
         const selectedEndDate = ref(new Date().toISOString().split('T')[0]);
         const isRangeMode = ref(false);
         
+        // 新增：餐廳數據的響應式狀態
+        const restaurantRating = ref(0); // 0 代表未評分
+        const restaurantStatus = ref(""); // "yes" -> 可以再去, "no" -> 永不再去, "" -> 未標示
+
         const isEditingMode = ref(false);
         const currentEditingId = ref(null);
 
-        // 搜尋文字改變時，自動跳回分頁第一頁
-        watch(searchText, () => {
-          currentPage.value = 1;
-        });
+        watch(searchText, () => { currentPage.value = 1; });
 
-        // 在一起天數計算
+        // 清除食評欄位
+        const clearRestaurantInfo = () => {
+          restaurantRating.value = 0;
+          restaurantStatus.value = "";
+        };
+
         const daysTogether = computed(() => {
           const today = new Date();
           const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -260,13 +302,11 @@
           return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
         });
 
-        // 從資料中動態提取所有的年份
         const availableYears = computed(() => {
           const years = memories.value.map(m => m.date ? m.date.split("-")[0] : null).filter(Boolean);
           return [...new Set(years)].sort((a, b) => b - a);
         });
 
-        // 動態提取所選年份下的月份（刪去了全部月份選項，直接取資料中有的月份）
         const availableMonths = computed(() => {
           if (selectedYear.value === 'all') return [];
           const months = memories.value
@@ -276,38 +316,19 @@
           return [...new Set(months)].sort((a, b) => b - a);
         });
 
-        // 頂部導覽提示字樣優化
         const currentFilterText = computed(() => {
           if (searchText.value.trim()) return `搜尋「${searchText.value}」的結果`;
           if (selectedYear.value === 'all') return '總覽所有甜蜜回憶 ✨';
           
           const y = `${selectedYear.value}年`;
-          const m = selectedMonth.value === 'all' ? '整年回憶' : `${parseInt(selectedMonth.value)}月`;
+          const m = selectedMonth.value === 'all_months' ? '整年回憶' : `${parseInt(selectedMonth.value)}月`;
           return `${y} ➔ ${m}`;
         });
 
         const changeYear = (year) => {
           selectedYear.value = year;
-          // 當選擇具體年份時，由於沒有「全部月份」了，我們預設選取該年份中有資料的第一個月份
+          selectedMonth.value = "all_months"; // 自動切換成看整年
           currentPage.value = 1;
-          
-          if (year === 'all') {
-            selectedMonth.value = "all";
-          } else {
-            // 稍等一會等計算屬性更新，或直接撈取該年份的第一個可用月份
-            const months = memories.value
-              .filter(m => m.date && m.date.startsWith(year))
-              .map(m => m.date.split("-")[1])
-              .filter(Boolean);
-            
-            if (months.length > 0) {
-              const uniqueMonths = [...new Set(months)].sort((a, b) => b - a);
-              // 預設切換到最新有資料的那個月
-              selectedMonth.value = uniqueMonths[0];
-            } else {
-              selectedMonth.value = "all";
-            }
-          }
         };
 
         const changeMonth = (month) => {
@@ -315,40 +336,45 @@
           currentPage.value = 1;
         };
 
-        // 核心大篩選與排序邏輯
+        // 核心大篩選：支援搜尋框內直接打「可以再去」、「永不再去」或星星
         const filteredMemories = computed(() => {
           let list = [...memories.value];
           list.sort((a, b) => b.date.localeCompare(a.date));
           
           if (selectedYear.value !== 'all') {
             list = list.filter(m => m.date && m.date.startsWith(selectedYear.value));
-            if (selectedMonth.value !== 'all') {
+            if (selectedMonth.value !== 'all_months') {
               list = list.filter(m => m.date && m.date.split("-")[1] === selectedMonth.value);
             }
           }
           
-          if (!searchText.value.trim()) return list;
-          return list.filter(m => m.content && m.content.toLowerCase().includes(searchText.value.toLowerCase()));
+          const query = searchText.value.trim().toLowerCase();
+          if (!query) return list;
+
+          // 擴展搜尋邏輯：內文、餐廳狀態代碼等
+          return list.filter(m => {
+            const matchContent = m.content && m.content.toLowerCase().includes(query);
+            const matchStatusYes = query.includes('再去') && m.restaurantStatus === 'yes';
+            const matchStatusNo = query.includes('永不') && m.restaurantStatus === 'no';
+            return matchContent || matchStatusYes || matchStatusNo;
+          });
         });
 
         const totalFilteredCount = computed(() => filteredMemories.value.length);
         const totalPages = computed(() => Math.ceil(totalFilteredCount.value / itemsPerPage) || 1);
 
-        // 分頁切片
         const paginatedMemories = computed(() => {
           const start = (currentPage.value - 1) * itemsPerPage;
           const end = start + itemsPerPage;
           return filteredMemories.value.slice(start, end);
         });
 
-        // 長文字縮短顯示
         const getTruncatedContent = (content) => {
           if (!content) return "";
           if (content.length <= 70) return content;
           return content.slice(0, 70);
         };
 
-        // 切換文字展開/收起
         const toggleExpand = (id) => {
           if (expandedCards.value.includes(id)) {
             expandedCards.value = expandedCards.value.filter(cid => cid !== id);
@@ -360,32 +386,12 @@
         const prevPage = () => { if (currentPage.value > 1) currentPage.value--; window.scrollTo({top: 0, behavior: 'smooth'}); };
         const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; window.scrollTo({top: 0, behavior: 'smooth'}); };
 
-        // 從 Firebase Fetch 資料
         const fetchMemories = async () => {
           try {
             const res = await fetch(firebaseUrl);
             const data = await res.json();
             if (data) {
               memories.value = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-              
-              // 檢查防呆：如果目前選取的年份/月份完全沒資料，就自動切換成「全部」總覽
-              const hasCurrentRecords = memories.value.some(m => m.date && m.date.startsWith(`${selectedYear.value}-${selectedMonth.value}`));
-              if (!hasCurrentRecords && selectedYear.value === currentYearStr) {
-                // 如果今年今月沒資料，嘗試找今年最新有資料的月份
-                const thisYearMonths = memories.value
-                  .filter(m => m.date && m.date.startsWith(currentYearStr))
-                  .map(m => m.date.split("-")[1])
-                  .filter(Boolean);
-                
-                if (thisYearMonths.length > 0) {
-                  const sortedM = [...new Set(thisYearMonths)].sort((a, b) => b - a);
-                  selectedMonth.value = sortedM[0];
-                } else {
-                  // 如果連今年都沒資料，就直接去「全部」總覽
-                  selectedYear.value = "all";
-                  selectedMonth.value = "all";
-                }
-              }
             } else {
               memories.value = [];
             }
@@ -402,6 +408,8 @@
           isRangeMode.value = false;
           currentEditingId.value = null;
           newContent.value = "";
+          clearRestaurantInfo(); // 初始化清空食評
+          
           const hktToday = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000);
           const todayStr = hktToday.toISOString().split('T')[0];
           selectedDate.value = todayStr;
@@ -414,6 +422,11 @@
           currentEditingId.value = item.id;
           newContent.value = item.content;
           selectedDate.value = item.date;
+          
+          // 載入舊有的餐廳評分資料（若無則設回初始值）
+          restaurantRating.value = item.restaurantRating || 0;
+          restaurantStatus.value = item.restaurantStatus || "";
+          
           if (item.isRange) {
             isRangeMode.value = true;
             selectedEndDate.value = item.endDate;
@@ -425,7 +438,7 @@
         };
 
         const saveMemory = async () => {
-          if (!newContent.value.trim()) return;
+          if (!newContent.value.trim() && !restaurantRating.value && !restaurantStatus.value) return;
           if (isRangeMode.value && selectedEndDate.value < selectedDate.value) {
             selectedEndDate.value = selectedDate.value;
           }
@@ -435,11 +448,14 @@
             const key = isEditingMode.value ? currentEditingId.value : ("memory_" + Date.now());
             const singleUrl = firebaseUrl.replace(".json", `/${key}.json`);
             
+            // 打包新版欄位，上傳至 Firebase Realtime Database
             const payload = {
               date: selectedDate.value,
               content: newContent.value,
               isRange: isRangeMode.value,
-              endDate: isRangeMode.value ? selectedEndDate.value : null
+              endDate: isRangeMode.value ? selectedEndDate.value : null,
+              restaurantRating: restaurantRating.value, // 星星數 (1-5)
+              restaurantStatus: restaurantStatus.value  // "yes" / "no" / ""
             };
 
             await fetch(singleUrl, {
@@ -449,6 +465,7 @@
             });
             
             newContent.value = "";
+            clearRestaurantInfo();
             await fetchMemories();
           } catch (e) { alert("儲存失敗！"); }
           isSyncing.value = false;
@@ -470,7 +487,7 @@
           setInterval(silentFetch, 5000); 
         });
 
-        return { daysTogether, availableYears, availableMonths, selectedYear, selectedMonth, changeYear, changeMonth, searchText, currentFilterText, totalFilteredCount, currentPage, totalPages, paginatedMemories, expandedCards, getTruncatedContent, toggleExpand, prevPage, nextPage, showModal, isSyncing, newContent, selectedDate, selectedEndDate, isRangeMode, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory };
+        return { daysTogether, availableYears, availableMonths, selectedYear, selectedMonth, changeYear, changeMonth, searchText, currentFilterText, totalFilteredCount, currentPage, totalPages, paginatedMemories, expandedCards, getTruncatedContent, toggleExpand, prevPage, nextPage, showModal, isSyncing, newContent, selectedDate, selectedEndDate, isRangeMode, isEditingMode, openAddDialog, openEditDialog, saveMemory, deleteMemory, restaurantRating, restaurantStatus, clearRestaurantInfo };
       }
     }).mount('#app');
   </script>
